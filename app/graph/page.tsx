@@ -59,57 +59,105 @@ export default function GraphPage() {
   }, []);
 
   useEffect(() => {
-    // Detectar se está na Vercel (não suporta Socket.io)
-    const isVercel =
+    let pollInterval: NodeJS.Timeout | null = null;
+    let socketTimeout: NodeJS.Timeout | null = null;
+    let connectionAttempts = 0;
+    const maxConnectionAttempts = 3;
+
+    // Detectar ambientes que não suportam WebSocket (Vercel, etc)
+    const isServerless =
       typeof window !== "undefined" &&
-      window.location.hostname.includes("vercel.app");
+      (window.location.hostname.includes("vercel.app") ||
+        window.location.hostname.includes("vercel.sh") ||
+        window.location.hostname.includes(".vercel.app") ||
+        window.location.hostname.includes("netlify.app") ||
+        window.location.hostname.includes("cloudflarepages.com") ||
+        window.location.hostname.includes("onrender.com") ||
+        window.location.hostname.includes("railway.app"));
 
-    if (isVercel) {
-      console.log("⚠️ Vercel detectado - usando polling HTTP ao invés de Socket.io");
-      
-      // Carregar dados iniciais
-      loadGraph();
+    // Carregar dados iniciais
+    loadGraph();
 
-      // Polling HTTP simples como fallback na Vercel
-      const pollInterval = setInterval(() => {
+    // Função para iniciar polling HTTP
+    const startPolling = () => {
+      console.log("🔄 Iniciando polling HTTP a cada 1 segundo");
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(() => {
         loadGraph();
-      }, 3000); // Atualizar a cada 3 segundos
+      }, 1000); // Atualizar a cada 1 segundo
+    };
 
+    // Se estiver em ambiente serverless, usar polling direto
+    if (isServerless) {
+      console.log("⚠️ Ambiente serverless detectado - usando polling HTTP direto");
+      startPolling();
       return () => {
-        clearInterval(pollInterval);
+        if (pollInterval) clearInterval(pollInterval);
       };
     }
 
-    // Socket.io apenas em desenvolvimento/local
+    // Tentar conectar ao Socket.io apenas em ambientes que suportam
     const socketUrl =
       typeof window !== "undefined"
         ? window.location.origin
         : process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
-    console.log("Conectando ao Socket.io em:", socketUrl);
+    console.log("🔌 Tentando conectar ao Socket.io em:", socketUrl);
 
     const newSocket = io(socketUrl, {
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: maxConnectionAttempts,
       autoConnect: true,
+      timeout: 5000, // Timeout de 5 segundos
     });
+
+    // Timeout: se não conectar em 5 segundos, usar polling
+    socketTimeout = setTimeout(() => {
+      if (!newSocket.connected) {
+        console.log("⏱️ Timeout ao conectar Socket.io - usando polling HTTP");
+        newSocket.close();
+        startPolling();
+      }
+    }, 5000);
 
     newSocket.on("connect", () => {
       console.log("✅ Conectado ao Socket.io - /graph, ID:", newSocket.id);
+      connectionAttempts = 0;
+      if (socketTimeout) clearTimeout(socketTimeout);
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
     });
 
     newSocket.on("disconnect", (reason) => {
       console.log("❌ Desconectado do Socket.io, motivo:", reason);
+      // Se desconectar, iniciar polling como fallback
+      if (reason === "io server disconnect" || reason === "transport close") {
+        startPolling();
+      }
     });
 
     newSocket.on("connect_error", (error) => {
-      console.error("❌ Erro ao conectar Socket.io:", error);
+      connectionAttempts++;
+      console.error(`❌ Erro ao conectar Socket.io (tentativa ${connectionAttempts}/${maxConnectionAttempts}):`, error.message);
+      
+      // Se exceder tentativas, usar polling
+      if (connectionAttempts >= maxConnectionAttempts) {
+        console.log("🔄 Máximo de tentativas excedido - usando polling HTTP");
+        newSocket.close();
+        startPolling();
+      }
     });
 
     newSocket.on("reconnect", (attemptNumber) => {
       console.log("🔄 Reconectado ao Socket.io após", attemptNumber, "tentativas");
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
     });
 
     // Escutar evento de atualização do grafo
@@ -120,10 +168,9 @@ export default function GraphPage() {
 
     setSocket(newSocket);
 
-    // Carregar dados iniciais
-    loadGraph();
-
     return () => {
+      if (socketTimeout) clearTimeout(socketTimeout);
+      if (pollInterval) clearInterval(pollInterval);
       newSocket.off("connect");
       newSocket.off("disconnect");
       newSocket.off("connect_error");
