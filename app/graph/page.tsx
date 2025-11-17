@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import CytoscapeComponent from "react-cytoscapejs";
 import type Cytoscape from "cytoscape";
 import { io, Socket } from "socket.io-client";
@@ -33,21 +33,61 @@ export default function GraphPage() {
         return;
       }
       const data = await response.json();
-      setNodes(Array.isArray(data.nodes) ? data.nodes : []);
-      setEdges(Array.isArray(data.edges) ? data.edges : []);
+      const newNodes = Array.isArray(data.nodes) ? data.nodes : [];
+      const newEdges = Array.isArray(data.edges) ? data.edges : [];
       
-      // Atualizar layout do Cytoscape após carregar dados
-      if (cyRef.current) {
-        setTimeout(() => {
-          const layout = {
-            name: "cose",
-            animate: true,
-            animationDuration: 1000,
-            fit: true,
-            padding: 30,
-          };
-          cyRef.current?.layout(layout).run();
-        }, 100);
+      // Comparar dados para evitar atualizações desnecessárias
+      // Comparação mais eficiente: verificar IDs e estrutura básica
+      const nodesChanged = 
+        nodes.length !== newNodes.length ||
+        nodes.some((node, i) => 
+          !newNodes[i] || 
+          node.id !== newNodes[i].id || 
+          node.label !== newNodes[i].label
+        ) ||
+        newNodes.some((node, i) => 
+          !nodes[i] || 
+          node.id !== nodes[i].id || 
+          node.label !== nodes[i].label
+        );
+      
+      const edgesChanged = 
+        edges.length !== newEdges.length ||
+        edges.some((edge, i) => 
+          !newEdges[i] || 
+          edge.source !== newEdges[i].source || 
+          edge.target !== newEdges[i].target
+        ) ||
+        newEdges.some((edge, i) => 
+          !edges[i] || 
+          edge.source !== edges[i].source || 
+          edge.target !== edges[i].target
+        );
+      
+      // Só atualizar se houver mudanças reais
+      if (nodesChanged || edgesChanged) {
+        setNodes(newNodes);
+        setEdges(newEdges);
+        
+        // Atualizar layout do Cytoscape apenas se houver mudanças significativas
+        // (novos nós ou novas arestas, não apenas reordenação)
+        if (cyRef.current) {
+          const hasNewNodes = newNodes.length > nodes.length;
+          const hasNewEdges = newEdges.length > edges.length;
+          
+          if (hasNewNodes || hasNewEdges) {
+            setTimeout(() => {
+              const layout = {
+                name: "cose",
+                animate: true,
+                animationDuration: 1000,
+                fit: true,
+                padding: 30,
+              };
+              cyRef.current?.layout(layout).run();
+            }, 100);
+          }
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar grafo:", error);
@@ -56,7 +96,7 @@ export default function GraphPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [nodes, edges]);
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout | null = null;
@@ -259,24 +299,27 @@ export default function GraphPage() {
     },
   ];
 
-  const safeNodes = Array.isArray(nodes) ? nodes : [];
-  const safeEdges = Array.isArray(edges) ? edges : [];
+  // Memoizar elementos do Cytoscape para evitar recálculos desnecessários
+  const cyElements = useMemo(() => {
+    const safeNodes = Array.isArray(nodes) ? nodes : [];
+    const safeEdges = Array.isArray(edges) ? edges : [];
 
-  const cyElements = [
-    ...safeNodes.map((node) => ({
-      data: {
-        id: node.id,
-        label: node.label,
-      },
-    })),
-    ...safeEdges.map((edge, index) => ({
-      data: {
-        id: `edge-${index}`,
-        source: edge.source,
-        target: edge.target,
-      },
-    })),
-  ];
+    return [
+      ...safeNodes.map((node) => ({
+        data: {
+          id: node.id,
+          label: node.label,
+        },
+      })),
+      ...safeEdges.map((edge, index) => ({
+        data: {
+          id: `edge-${index}`,
+          source: edge.source,
+          target: edge.target,
+        },
+      })),
+    ];
+  }, [nodes, edges]);
 
   // Configuração do layout do Cytoscape
   const cyLayout = {
@@ -287,14 +330,14 @@ export default function GraphPage() {
     padding: 30,
   };
 
-  // Ajustar layout quando entrar/sair de tela cheia ou quando os elementos mudarem
+  // Ajustar layout apenas quando entrar/sair de tela cheia
   useEffect(() => {
-    if (cyRef.current && cyElements.length > 0) {
+    if (cyRef.current && cyElements.length > 0 && isFullscreen !== undefined) {
       setTimeout(() => {
         cyRef.current?.layout(cyLayout).run();
       }, 100);
     }
-  }, [isFullscreen, nodes.length, edges.length]);
+  }, [isFullscreen]);
 
   return (
     <div
