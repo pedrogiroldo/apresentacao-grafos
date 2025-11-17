@@ -68,12 +68,17 @@ export default function GraphPage() {
     console.log("Conectando ao Socket.io em:", socketUrl);
 
     // Conectar Socket.io
+    // Na Vercel, usar apenas polling (não suporta WebSockets persistentes)
+    const isVercel = typeof window !== "undefined" && window.location.hostname.includes("vercel.app");
+    const transports = isVercel ? ["polling"] : ["websocket", "polling"];
+    
     const newSocket = io(socketUrl, {
-      transports: ["websocket", "polling"],
+      transports,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
       autoConnect: true,
+      forceNew: false,
     });
 
     newSocket.on("connect", () => {
