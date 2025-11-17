@@ -59,7 +59,28 @@ export default function GraphPage() {
   }, []);
 
   useEffect(() => {
-    // Determinar URL do Socket.io (usar window.location.origin no cliente)
+    // Detectar se está na Vercel (não suporta Socket.io)
+    const isVercel =
+      typeof window !== "undefined" &&
+      window.location.hostname.includes("vercel.app");
+
+    if (isVercel) {
+      console.log("⚠️ Vercel detectado - usando polling HTTP ao invés de Socket.io");
+      
+      // Carregar dados iniciais
+      loadGraph();
+
+      // Polling HTTP simples como fallback na Vercel
+      const pollInterval = setInterval(() => {
+        loadGraph();
+      }, 3000); // Atualizar a cada 3 segundos
+
+      return () => {
+        clearInterval(pollInterval);
+      };
+    }
+
+    // Socket.io apenas em desenvolvimento/local
     const socketUrl =
       typeof window !== "undefined"
         ? window.location.origin
@@ -67,18 +88,12 @@ export default function GraphPage() {
 
     console.log("Conectando ao Socket.io em:", socketUrl);
 
-    // Conectar Socket.io
-    // Na Vercel, usar apenas polling (não suporta WebSockets persistentes)
-    const isVercel = typeof window !== "undefined" && window.location.hostname.includes("vercel.app");
-    const transports = isVercel ? ["polling"] : ["websocket", "polling"];
-    
     const newSocket = io(socketUrl, {
-      transports,
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
       autoConnect: true,
-      forceNew: false,
     });
 
     newSocket.on("connect", () => {
@@ -97,19 +112,10 @@ export default function GraphPage() {
       console.log("🔄 Reconectado ao Socket.io após", attemptNumber, "tentativas");
     });
 
-    newSocket.on("reconnect_attempt", (attemptNumber) => {
-      console.log("🔄 Tentativa de reconexão", attemptNumber);
-    });
-
     // Escutar evento de atualização do grafo
     newSocket.on("graph-updated", () => {
       console.log("📡 Evento graph-updated recebido, atualizando grafo...");
       loadGraph();
-    });
-
-    // Escutar todos os eventos para debug
-    newSocket.onAny((eventName, ...args) => {
-      console.log("📨 Evento recebido:", eventName, args);
     });
 
     setSocket(newSocket);
@@ -118,14 +124,11 @@ export default function GraphPage() {
     loadGraph();
 
     return () => {
-      console.log("🧹 Limpando conexão Socket.io");
       newSocket.off("connect");
       newSocket.off("disconnect");
       newSocket.off("connect_error");
       newSocket.off("reconnect");
-      newSocket.off("reconnect_attempt");
       newSocket.off("graph-updated");
-      newSocket.offAny();
       newSocket.close();
     };
   }, [loadGraph]);
