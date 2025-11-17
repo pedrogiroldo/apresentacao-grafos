@@ -27,15 +27,18 @@ export async function GET(request: Request) {
     // Se houver um usuário logado, verificar quem ele segue
     let followingIds: number[] = [];
     if (currentUserId) {
-      const currentUser = await prisma.user.findUnique({
-        where: { id: parseInt(currentUserId) },
-        select: {
-          following: {
-            select: { id: true },
+      const userId = parseInt(currentUserId);
+      if (!isNaN(userId)) {
+        const currentUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            following: {
+              select: { id: true },
+            },
           },
-        },
-      });
-      followingIds = currentUser?.following.map((u) => u.id) || [];
+        });
+        followingIds = currentUser?.following.map((u) => u.id) || [];
+      }
     }
 
     const usersWithFollowStatus = users.map((user) => ({

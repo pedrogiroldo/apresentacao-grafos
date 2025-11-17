@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import CytoscapeComponent from "react-cytoscapejs";
+import type Cytoscape from "cytoscape";
 import { io, Socket } from "socket.io-client";
 
 interface Node {
@@ -44,6 +45,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [socket, setSocket] = useState<Socket | null>(null);
   const cyRef = useRef<any>(null);
+  const currentUserRef = useRef<any>(null);
 
   useEffect(() => {
     // Verificar autenticação
@@ -55,11 +57,15 @@ export default function HomePage() {
 
     const user = JSON.parse(userStr);
     setCurrentUser(user);
+    currentUserRef.current = user; // Atualizar ref também
 
     // Conectar Socket.io
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000", {
-      transports: ["websocket", "polling"],
-    });
+    const newSocket = io(
+      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000",
+      {
+        transports: ["websocket", "polling"],
+      },
+    );
 
     newSocket.on("connect", () => {
       console.log("Conectado ao Socket.io");
@@ -74,7 +80,10 @@ export default function HomePage() {
     });
 
     newSocket.on("users-updated", () => {
-      loadUsers();
+      // Usar ref para acessar o valor atual
+      if (currentUserRef.current?.id) {
+        loadUsers();
+      }
     });
 
     setSocket(newSocket);
@@ -88,6 +97,11 @@ export default function HomePage() {
       newSocket.close();
     };
   }, [router]);
+
+  // Manter ref sincronizada com o estado
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   const loadGraph = async () => {
     try {
@@ -123,11 +137,16 @@ export default function HomePage() {
 
   const loadUsers = async () => {
     try {
-      const userId = currentUser?.id;
-      const response = await fetch(`/api/users${userId ? `?currentUserId=${userId}` : ""}`);
+      // Usar ref para garantir que sempre temos o valor atual
+      const userId = currentUserRef.current?.id || currentUser?.id;
+      if (!userId) return;
+      
+      const response = await fetch(`/api/users?currentUserId=${userId}`);
       if (response.ok) {
         const data = await response.json();
-        setUsers(Array.isArray(data.users) ? data.users : []);
+        if (Array.isArray(data.users)) {
+          setUsers(data.users);
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar usuários:", error);
@@ -135,49 +154,93 @@ export default function HomePage() {
   };
 
   const handleFollow = async (followingId: number) => {
-    if (!currentUser) return;
+    const userId = currentUserRef.current?.id || currentUser?.id;
+    if (!userId) return;
+
+    // Atualizar estado local imediatamente (otimista)
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.id === followingId ? { ...user, isFollowing: true } : user
+      )
+    );
 
     try {
       const response = await fetch("/api/follow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          followerId: currentUser.id,
+          followerId: userId,
           followingId,
         }),
       });
 
       if (response.ok) {
+        // Recarregar para sincronizar com o servidor
         await loadUsers();
         await loadGraph();
         await loadPosts();
         // Socket emitirá evento automaticamente via API
+      } else {
+        // Reverter se houver erro
+        setUsers((prevUsers) =>
+          prevUsers.map((user) =>
+            user.id === followingId ? { ...user, isFollowing: false } : user
+          )
+        );
       }
     } catch (error) {
       console.error("Erro ao seguir:", error);
+      // Reverter em caso de erro
+      setUsers((prevUsers) =>
+        prevUsers.map((user) =>
+          user.id === followingId ? { ...user, isFollowing: false } : user
+        )
+      );
     }
   };
 
   const handleUnfollow = async (followingId: number) => {
-    if (!currentUser) return;
+    const userId = currentUserRef.current?.id || currentUser?.id;
+    if (!userId) return;
+
+    // Atualizar estado local imediatamente (otimista)
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.id === followingId ? { ...user, isFollowing: false } : user
+      )
+    );
 
     try {
       const response = await fetch("/api/unfollow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          followerId: currentUser.id,
+          followerId: userId,
           followingId,
         }),
       });
 
       if (response.ok) {
+        // Recarregar para sincronizar com o servidor
         await loadUsers();
         await loadGraph();
         await loadPosts();
+      } else {
+        // Reverter se houver erro
+        setUsers((prevUsers) =>
+          prevUsers.map((user) =>
+            user.id === followingId ? { ...user, isFollowing: true } : user
+          )
+        );
       }
     } catch (error) {
       console.error("Erro ao deixar de seguir:", error);
+      // Reverter em caso de erro
+      setUsers((prevUsers) =>
+        prevUsers.map((user) =>
+          user.id === followingId ? { ...user, isFollowing: true } : user
+        )
+      );
     }
   };
 
@@ -275,7 +338,10 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-4">
               <span className="text-zinc-400">
-                Olá, <span className="text-zinc-100 font-medium">{currentUser?.name}</span>
+                Olá,{" "}
+                <span className="text-zinc-100 font-medium">
+                  {currentUser?.name}
+                </span>
               </span>
               <button
                 onClick={handleLogout}
@@ -295,31 +361,43 @@ export default function HomePage() {
             {/* Grafo */}
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 backdrop-blur-sm shadow-2xl">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-zinc-100">Grafo de Relacionamentos</h2>
+                <h2 className="text-xl font-semibold text-zinc-100">
+                  Grafo de Relacionamentos
+                </h2>
                 <div className="flex gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   <span className="text-sm text-zinc-400">Live</span>
                 </div>
               </div>
               <div className="bg-zinc-950 rounded-lg border border-zinc-800 h-[500px] overflow-hidden shadow-inner">
-                <CytoscapeComponent
-                  elements={cyElements}
-                  style={{ width: "100%", height: "100%" }}
-                  stylesheet={cyStylesheet}
-                  layout={cyLayout}
-                  cy={(cy: any) => {
-                    cyRef.current = cy;
-                  }}
-                />
+                {cyElements.length > 0 ? (
+                  <CytoscapeComponent
+                    elements={cyElements}
+                    style={{ width: "100%", height: "100%" }}
+                    stylesheet={cyStylesheet}
+                    layout={cyLayout}
+                    cy={(cy: Cytoscape.Core) => {
+                      cyRef.current = cy;
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                    Nenhum dado para exibir
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Posts */}
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 backdrop-blur-sm shadow-xl">
-              <h2 className="text-xl font-semibold text-zinc-100 mb-4">Atividade Recente</h2>
+              <h2 className="text-xl font-semibold text-zinc-100 mb-4">
+                Atividade Recente
+              </h2>
               <div className="space-y-4 max-h-[400px] overflow-y-auto">
                 {posts.length === 0 ? (
-                  <p className="text-zinc-400 text-center py-8">Nenhuma atividade ainda</p>
+                  <p className="text-zinc-400 text-center py-8">
+                    Nenhuma atividade ainda
+                  </p>
                 ) : (
                   posts.map((post) => (
                     <div
@@ -332,11 +410,19 @@ export default function HomePage() {
                         </div>
                         <div className="flex-1">
                           <p className="text-zinc-100">
-                            <span className="font-semibold">{post.follower.name}</span>{" "}
-                            {post.action === "follow" ? "seguiu" : "deixou de seguir"}{" "}
-                            <span className="font-semibold">{post.following.name}</span>
+                            <span className="font-semibold">
+                              {post.follower.name}
+                            </span>{" "}
+                            {post.action === "follow"
+                              ? "seguiu"
+                              : "deixou de seguir"}{" "}
+                            <span className="font-semibold">
+                              {post.following.name}
+                            </span>
                           </p>
-                          <p className="text-zinc-400 text-sm mt-1">{formatDate(post.createdAt)}</p>
+                          <p className="text-zinc-400 text-sm mt-1">
+                            {formatDate(post.createdAt)}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -349,10 +435,14 @@ export default function HomePage() {
           {/* Coluna 2: Lista de Usuários */}
           <div className="space-y-6">
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 backdrop-blur-sm shadow-xl">
-              <h2 className="text-xl font-semibold text-zinc-100 mb-4">Usuários</h2>
+              <h2 className="text-xl font-semibold text-zinc-100 mb-4">
+                Usuários
+              </h2>
               <div className="space-y-3 max-h-[800px] overflow-y-auto">
                 {users.length === 0 ? (
-                  <p className="text-zinc-400 text-center py-8">Nenhum usuário encontrado</p>
+                  <p className="text-zinc-400 text-center py-8">
+                    Nenhum usuário encontrado
+                  </p>
                 ) : (
                   users
                     .filter((user) => user.id !== currentUser?.id)
@@ -367,8 +457,12 @@ export default function HomePage() {
                               {user.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-semibold text-zinc-100">{user.name}</p>
-                              <p className="text-sm text-zinc-400">@{user.username}</p>
+                              <p className="font-semibold text-zinc-100">
+                                {user.name}
+                              </p>
+                              <p className="text-sm text-zinc-400">
+                                @{user.username}
+                              </p>
                             </div>
                           </div>
                           <button
