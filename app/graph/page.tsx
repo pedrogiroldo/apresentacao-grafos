@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import CytoscapeComponent from "react-cytoscapejs";
 import type Cytoscape from "cytoscape";
 import { io, Socket } from "socket.io-client";
@@ -24,7 +24,7 @@ export default function GraphPage() {
   const cyRef = useRef<Cytoscape.Core | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const loadGraph = async () => {
+  const loadGraph = useCallback(async () => {
     try {
       const response = await fetch("/api/graph");
       if (!response.ok) {
@@ -35,6 +35,20 @@ export default function GraphPage() {
       const data = await response.json();
       setNodes(Array.isArray(data.nodes) ? data.nodes : []);
       setEdges(Array.isArray(data.edges) ? data.edges : []);
+      
+      // Atualizar layout do Cytoscape após carregar dados
+      if (cyRef.current) {
+        setTimeout(() => {
+          const layout = {
+            name: "cose",
+            animate: true,
+            animationDuration: 1000,
+            fit: true,
+            padding: 30,
+          };
+          cyRef.current?.layout(layout).run();
+        }, 100);
+      }
     } catch (error) {
       console.error("Erro ao carregar grafo:", error);
       setNodes([]);
@@ -42,7 +56,7 @@ export default function GraphPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Conectar Socket.io
@@ -50,14 +64,27 @@ export default function GraphPage() {
       process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000",
       {
         transports: ["websocket", "polling"],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
       },
     );
 
     newSocket.on("connect", () => {
-      console.log("Conectado ao Socket.io");
+      console.log("Conectado ao Socket.io - /graph");
     });
 
+    newSocket.on("disconnect", () => {
+      console.log("Desconectado do Socket.io");
+    });
+
+    newSocket.on("connect_error", (error) => {
+      console.error("Erro ao conectar Socket.io:", error);
+    });
+
+    // Escutar evento de atualização do grafo
     newSocket.on("graph-updated", () => {
+      console.log("Evento graph-updated recebido, atualizando grafo...");
       loadGraph();
     });
 
@@ -67,9 +94,13 @@ export default function GraphPage() {
     loadGraph();
 
     return () => {
+      newSocket.off("connect");
+      newSocket.off("disconnect");
+      newSocket.off("connect_error");
+      newSocket.off("graph-updated");
       newSocket.close();
     };
-  }, []);
+  }, [loadGraph]);
 
   // Função para entrar/sair de tela cheia
   const toggleFullscreen = () => {
@@ -150,14 +181,6 @@ export default function GraphPage() {
     },
   ];
 
-  const cyLayout = {
-    name: "cose",
-    animate: true,
-    animationDuration: 1000,
-    fit: true,
-    padding: 30,
-  };
-
   const safeNodes = Array.isArray(nodes) ? nodes : [];
   const safeEdges = Array.isArray(edges) ? edges : [];
 
@@ -177,14 +200,23 @@ export default function GraphPage() {
     })),
   ];
 
-  // Ajustar layout quando entrar/sair de tela cheia
+  // Configuração do layout do Cytoscape
+  const cyLayout = {
+    name: "cose",
+    animate: true,
+    animationDuration: 1000,
+    fit: true,
+    padding: 30,
+  };
+
+  // Ajustar layout quando entrar/sair de tela cheia ou quando os elementos mudarem
   useEffect(() => {
     if (cyRef.current && cyElements.length > 0) {
       setTimeout(() => {
         cyRef.current?.layout(cyLayout).run();
       }, 100);
     }
-  }, [isFullscreen, cyElements.length]);
+  }, [isFullscreen, nodes.length, edges.length]);
 
   return (
     <div
