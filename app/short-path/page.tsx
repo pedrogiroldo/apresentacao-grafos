@@ -313,7 +313,7 @@ export default function ShortPathPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 flex flex-col">
+    <div className="min-h-screen lg:h-screen bg-zinc-950 text-zinc-50 flex flex-col">
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 max-w-[1920px]">
@@ -323,12 +323,12 @@ export default function ShortPathPage() {
         </div>
       </header>
 
-      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 max-w-[1920px] flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 max-w-[1920px] flex-1 overflow-y-auto lg:overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:h-full">
           {/* Coluna 1: Visualização do Grafo - Em cima no mobile, esquerda no desktop */}
-          <div className="lg:col-span-2 flex flex-col gap-4 order-1 lg:order-1">
+          <div className="lg:col-span-2 flex flex-col gap-4 order-1 lg:order-1 lg:h-full lg:max-h-full lg:overflow-hidden">
             {/* Grafo */}
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2 sm:p-4 backdrop-blur-sm shadow-2xl flex flex-col min-h-[400px] sm:min-h-[500px] lg:min-h-0 lg:flex-1">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2 sm:p-4 backdrop-blur-sm shadow-2xl flex flex-col min-h-[400px] sm:min-h-[500px] lg:min-h-0 lg:flex-1 lg:h-full lg:max-h-full lg:overflow-hidden">
               <div className="flex items-center justify-between mb-2 sm:mb-3 flex-shrink-0">
                 <h2 className="text-base sm:text-lg md:text-xl font-semibold text-zinc-100">
                   Visualização do Grafo
@@ -355,7 +355,7 @@ export default function ShortPathPage() {
                   <span className="hidden sm:inline">Tela Cheia</span>
                 </button>
               </div>
-              <div className="bg-zinc-950 rounded-lg border border-zinc-800 flex-1 overflow-hidden shadow-inner min-h-[350px] sm:min-h-[450px] lg:min-h-0">
+              <div className="bg-zinc-950 rounded-lg border border-zinc-800 flex-1 overflow-hidden shadow-inner min-h-[350px] sm:min-h-[450px] lg:min-h-0 lg:h-full lg:max-h-full">
                 {cyElements.length > 0 ? (
                   <CytoscapeComponent
                     elements={cyElements}
