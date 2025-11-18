@@ -162,7 +162,7 @@ export default function ShortPathPage() {
   };
 
   // Estilos do cytoscape
-  const cyStylesheet: cytoscape.Stylesheet[] = [
+  const cyStylesheet = [
     {
       selector: "node",
       style: {

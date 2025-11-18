@@ -1,36 +1,131 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Grafogram
 
-## Getting Started
+Uma aplicação web interativa que demonstra o uso prático de grafos em situações reais. O Grafogram é uma rede social onde os relacionamentos entre usuários são representados como um grafo, permitindo visualizar e analisar conexões sociais de forma intuitiva.
 
-First, run the development server:
+## 🎯 Sobre o Projeto
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+O **Grafogram** é uma ferramenta educacional que mostra como a teoria dos grafos pode ser aplicada em situações reais. Através de uma rede social simples, você pode:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Criar uma conta e se conectar com outros usuários
+- Visualizar o grafo de relacionamentos em tempo real
+- Ver como as conexões sociais formam uma estrutura de grafo
+- Calcular o caminho mais curto entre dois usuários usando o algoritmo de Dijkstra
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📊 Representações Reais de Grafos
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 1. **Rede Social de Relacionamentos**
 
-## Learn More
+Na página principal, você visualiza um grafo onde:
+- **Nós (vértices)** = Usuários da plataforma
+- **Arestas (conexões)** = Relacionamentos de "seguir"
 
-To learn more about Next.js, take a look at the following resources:
+Cada vez que um usuário segue outro, uma nova aresta é criada no grafo, mostrando visualmente como as pessoas estão conectadas. Isso é exatamente como funcionam redes sociais reais como Twitter, Instagram e LinkedIn, onde os relacionamentos formam grafos complexos.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. **Feed de Atividades**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+O feed mostra a linha do tempo de ações (quem seguiu quem), demonstrando como eventos em um grafo podem ser registrados e visualizados cronologicamente. Isso representa como sistemas reais registram mudanças em estruturas de grafo.
 
-## Deploy on Vercel
+### 3. **Algoritmo de Caminho Mais Curto (Dijkstra)**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+A página "Caminho Mais Curto" permite:
+- Criar grafos personalizados com nós e arestas ponderadas
+- Calcular o caminho mais curto entre dois pontos
+- Visualizar o resultado destacado no grafo
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Este algoritmo tem aplicações práticas em:
+- **Sistemas de navegação** (GPS, Google Maps) - encontrar a rota mais rápida
+- **Redes de computadores** - roteamento de pacotes
+- **Logística** - otimização de rotas de entrega
+- **Redes sociais** - encontrar conexões entre pessoas (grau de separação)
+
+## ✨ Funcionalidades
+
+### Visualização de Grafo em Tempo Real
+- Veja o grafo de relacionamentos sendo atualizado instantaneamente
+- Cada usuário é um nó, cada relacionamento é uma aresta
+- O layout se ajusta automaticamente conforme novos relacionamentos são criados
+
+### Rede Social Interativa
+- Crie sua conta e faça login
+- Siga outros usuários e veja o grafo se atualizar
+- Visualize quem está conectado a quem
+
+### Calculadora de Caminho Mais Curto
+- Crie seus próprios grafos com nós e arestas
+- Defina pesos (distâncias) nas conexões
+- Calcule o caminho mais curto entre dois pontos
+- Veja o resultado visualmente destacado no grafo
+
+## 🚀 Como Usar
+
+### 1. Criar uma Conta
+- Acesse a aplicação e clique em "Criar conta"
+- Preencha seus dados e faça login
+
+### 2. Explorar o Grafo
+- Na página inicial, você verá o grafo de relacionamentos
+- Siga outros usuários para criar novas conexões
+- Observe como o grafo se atualiza em tempo real
+
+### 3. Calcular Caminhos
+- Acesse "Caminho Mais Curto" no menu
+- Carregue o exemplo inicial ou crie seu próprio grafo
+- Selecione origem e destino para calcular o caminho mais curto
+- Veja o resultado destacado em verde no grafo
+
+## 💡 Aplicações Práticas de Grafos
+
+Esta ferramenta demonstra como grafos são usados em:
+
+- **Redes Sociais**: Conexões entre pessoas (Facebook, LinkedIn)
+- **Navegação**: Rotas entre locais (Google Maps, Waze)
+- **Recomendações**: Sistemas que sugerem produtos ou pessoas baseados em conexões
+- **Análise de Redes**: Estudo de como informações se propagam
+- **Logística**: Otimização de rotas e distribuição
+- **Redes de Computadores**: Roteamento de dados na internet
+
+## 📋 Pré-requisitos
+
+Para executar a aplicação localmente, você precisa de:
+- Node.js instalado
+- Banco de dados PostgreSQL
+- pnpm (gerenciador de pacotes)
+
+## 🔧 Instalação Rápida
+
+1. Clone o repositório
+2. Instale as dependências: `pnpm install`
+3. Configure o banco de dados no arquivo `.env`
+4. Execute as migrations: `pnpm prisma migrate dev`
+5. Inicie a aplicação: `pnpm dev`
+
+A aplicação estará disponível em `http://localhost:3000`
+
+## 🐳 Usando Docker
+
+Consulte o arquivo `README-DOCKER.md` para instruções detalhadas sobre como executar com Docker.
+
+## 📚 Conceitos Demonstrados
+
+- **Grafos Direcionados**: Relacionamentos que têm direção (A segue B)
+- **Grafos Não Direcionados**: Conexões bidirecionais (usado no algoritmo de Dijkstra)
+- **Grafos Ponderados**: Arestas com pesos (distâncias, custos)
+- **Algoritmo de Dijkstra**: Encontrar o caminho mais curto em grafos ponderados
+- **Visualização de Grafos**: Layout automático e interativo
+- **Tempo Real**: Atualizações instantâneas via WebSocket
+
+## 🎓 Propósito Educacional
+
+O Grafogram foi criado para:
+- Demonstrar aplicações práticas da teoria dos grafos
+- Mostrar como estruturas de dados abstratas se manifestam em sistemas reais
+- Facilitar o aprendizado através de visualização interativa
+- Proporcionar uma experiência prática com algoritmos de grafos
+
+## 👤 Autor
+
+**Pedro Giroldo**
+
+---
+
+Uma ferramenta educacional para explorar o mundo dos grafos através de exemplos práticos e visuais.
